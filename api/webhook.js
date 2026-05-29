@@ -7,6 +7,7 @@ const SMTP_HOST = process.env.SMTP_HOST || 'mail.privateemail.com';
 const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587');
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
+const PADDLE_API_KEY = process.env.PADDLE_API_KEY;
 
 function computeChecksum(raw) {
   const seed = SECRET + raw;
@@ -35,32 +36,27 @@ function generateKey() {
   return `VBP-${p1}-${p2}-${p3}-${computeChecksum(raw)}`;
 }
 
-function extractEmail(body) {
-  return (
-    body?.data?.customer?.email ||
-    body?.data?.address?.email ||
-    body?.customer?.email ||
-    body?.email ||
-    body?.customer_email ||
-    body?.data?.email ||
-    null
-  );
-}
-
-function extractProduct(body) {
-  return (
-    body?.data?.items?.[0]?.price?.description ||
-    body?.data?.items?.[0]?.price?.name ||
-    body?.items?.[0]?.price?.description ||
-    body?.product_name ||
-    'Pro'
-  );
+async function getCustomerEmail(customerId) {
+  try {
+    const res = await fetch(`https://api.paddle.com/customers/${customerId}`, {
+      headers: {
+        'Authorization': `Bearer ${PADDLE_API_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    const data = await res.json();
+    console.log('Customer data:', JSON.stringify(data));
+    return data?.data?.email || null;
+  } catch(e) {
+    console.error('Failed to get customer email:', e.message);
+    return null;
+  }
 }
 
 async function saveToSupabase(email, licenseKey, plan) {
   if (!SUPABASE_URL || !SUPABASE_KEY) return;
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/licenses`, {
+    await fetch(`${SUPABASE_URL}/rest/v1/licenses`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -70,13 +66,9 @@ async function saveToSupabase(email, licenseKey, plan) {
       },
       body: JSON.stringify({ email, license_key: licenseKey, plan })
     });
-    if (res.ok) {
-      console.log(`✅ Saved to Supabase: ${email}`);
-    } else {
-      console.error('Supabase error:', await res.text());
-    }
+    console.log(`✅ Saved to Supabase: ${email}`);
   } catch(e) {
-    console.error('Supabase save failed:', e.message);
+    console.error('Supabase error:', e.message);
   }
 }
 
@@ -148,27 +140,30 @@ module.exports = async function handler(req, res) {
     const eventType = body?.event_type || body?.alert_name;
     console.log('Webhook received:', eventType);
 
-    const paymentEvents = [
-      'transaction.completed',
-      'subscription.created',
-      'payment_succeeded',
-      'subscription_payment_succeeded'
-    ];
-
+    const paymentEvents = ['transaction.completed', 'subscription.created'];
     if (!paymentEvents.includes(eventType)) {
       return res.status(200).json({ message: 'Event ignored', event: eventType });
     }
 
-    const customerEmail = extractEmail(body);
-    const productName = extractProduct(body);
+    // Get customer_id from payload
+    const customerId = body?.data?.customer_id;
+    console.log('Customer ID:', customerId);
 
-    if (!customerEmail) {
-      return res.status(400).json({ error: 'No customer email found' });
+    if (!customerId) {
+      return res.status(400).json({ error: 'No customer_id found' });
     }
 
+    // Fetch email from Paddle API
+    const customerEmail = await getCustomerEmail(customerId);
+    console.log('Customer email:', customerEmail);
+
+    if (!customerEmail) {
+      return res.status(400).json({ error: 'Could not fetch customer email' });
+    }
+
+    const productName = body?.data?.items?.[0]?.price?.description || 'Pro';
     const licenseKey = generateKey();
 
-    // Save to Supabase & Send email in parallel
     await Promise.all([
       saveToSupabase(customerEmail, licenseKey, productName),
       sendLicenseEmail(customerEmail, licenseKey, productName)
