@@ -91,7 +91,7 @@ async function sendLicenseEmail(customerEmail, licenseKey, productName) {
     html: `
       <div style="font-family:-apple-system,sans-serif;max-width:520px;margin:0 auto;padding:20px">
         <div style="text-align:center;margin-bottom:28px">
-          <div style="background:#ffcc00;width:56px;height:56px;border-radius:14px;display:inline-flex;align-items:center;justify-content:center;font-size:26px">🔊</div>
+          <img src="https://volumebooster.cc/wp-content/uploads/2026/05/cropped-cropped-icon128-37x37.png" width="56" height="56" style="border-radius:14px;display:block;margin:0 auto" alt="Volume Booster AI"/>
           <h1 style="color:#1a1a1a;margin:14px 0 4px;font-size:22px">Volume Booster AI</h1>
           <p style="color:#888;margin:0;font-size:14px">Your ${planName} is ready!</p>
         </div>
