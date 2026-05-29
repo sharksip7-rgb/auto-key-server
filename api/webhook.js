@@ -122,7 +122,7 @@ async function sendLicenseEmail(customerEmail, licenseKey, productName) {
         </div>
         <p style="color:#aaa;font-size:12px;text-align:center;margin:0">
           Need help? Reply to this email<br/>
-          <a href="https://volumebooster.cc" style="color:#b45309">volumebooster.cc</a> · MourigMedia 🇲🇦
+          <a href="https://volumebooster.cc" style="color:#b45309">volumebooster.cc</a>
         </p>
       </div>
     `
